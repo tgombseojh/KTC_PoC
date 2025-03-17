@@ -16,7 +16,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // 하트비트를 수신/스케줄링할 스레드풀 설정
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
         scheduler.setThreadNamePrefix("heartbeat-thread-");
-        scheduler.setPoolSize(1);
+        scheduler.setPoolSize(10);
         scheduler.initialize();
 
         config.enableSimpleBroker("/topic", "/queue")  // topic은 브로드캐스트, queue는 개인 메시지
@@ -33,8 +33,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         //registry.addEndpoint("/ws").setAllowedOrigins("*").withSockJS();
         registry.addEndpoint("/ws")
                 .setHandshakeHandler(new CustomHandshakeHandler()) // ✨ 여기
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
+                .setAllowedOriginPatterns("*");
+                //.withSockJS();
 
     }
 }

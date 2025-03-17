@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>KTC - 대기열 PoC</title>
-    <!-- SockJS와 Stomp.js 라이브러리 로드 -->
-    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <!-- Stomp.js (순수 WebSocket 지원 가능) -->
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
     <style>
         body {
             font-size: 4em;
@@ -46,70 +45,80 @@
     <button onclick="disconnect()">대기열 나가기</button>
 </div>
 <script>
-    var stompClient = null;
-    var currentOrder = 0;
-    var leftOrder = 0;
-    var isTheEnd = false;
+    const SERVER_URL = "ws://10.205.0.108:8080/ws";  // ✅ 순수 WebSocket 주소
+    let stompClient = null;
+    let currentOrder = 0;
+    let leftOrder = 0;
+    let isTheEnd = false;
 
     function log(message) {
-        var output = document.getElementById("output");
+        const output = document.getElementById("output");
         output.innerHTML += message + "<br>";
         output.scrollTop = output.scrollHeight;
     }
 
     function connect() {
-        // 이미 연결되어 있으면 추가 연결하지 않음
         if (stompClient && stompClient.connected) {
             log("이미 연결되어 있습니다.");
             return;
         }
 
-        var socket = new SockJS('/ws');
-        stompClient = Stomp.over(socket);
-        stompClient.heartbeat.outgoing = 5000; // 서버에 하트비트 보내기
-        stompClient.connect({}, function(frame) {
-            //log("연결됨: " + frame);
-            log("대기열에 연결되었습니다.");
+        stompClient = new StompJs.Client({
+            brokerURL: SERVER_URL, // ✅ 직접 WebSocket URL 지정
+            connectHeaders: {},
+            debug: function (str) {
+                //console.log(str); // 필요 시 활성화
+            },
+            heartbeatIncoming: 5000,
+            heartbeatOutgoing: 5000,
+            reconnectDelay: 5000,
+            onConnect: function (frame) {
+                log("대기열에 연결되었습니다.");
 
-            // /topic/order 토픽 구독 (초기 순번 업데이트)
-            stompClient.subscribe('/user/queue/order', function(message) {
-                currentOrder = parseInt(message.body, 10);
-                log("고객님의 순번은: " + currentOrder +"번째 입니다.");
-            });
+                stompClient.subscribe('/user/queue/order', function(message) {
+                    currentOrder = parseInt(message.body, 10);
+                    log("고객님의 순번은: " + currentOrder + "번째 입니다.");
+                });
 
-            // /topic/waiting 토픽 구독 (-1 이벤트 수신)
-            stompClient.subscribe('/topic/waiting', function(message) {
-                leftOrder = parseInt(message.body, 10);
-                if (currentOrder > 1) {
-                    if (currentOrder > leftOrder) {
+                stompClient.subscribe('/topic/waiting', function(message) {
+                    leftOrder = parseInt(message.body, 10);
+                    if (currentOrder > 1 && currentOrder > leftOrder) {
                         currentOrder--;
-                        log("앞선 고객님들의 접속 종료로 인해 순번 감소, \n고객님의 새로운 순번은 " + currentOrder +"번째 입니다.");
-                        stompClient.send("/app/update-order", {}, JSON.stringify({ newOrder: currentOrder }));
+                        log("앞선 고객님들의 접속 종료로 인해 순번 감소,\n고객님의 새로운 순번은 " + currentOrder + "번째 입니다.");
+                        stompClient.publish({
+                            destination: "/app/update-order",
+                            body: JSON.stringify({ newOrder: currentOrder })
+                        });
                     }
-                }
-                if (!isTheEnd) {
-                    if (currentOrder === 1) {
+
+                    if (!isTheEnd && currentOrder === 1) {
                         log("🎉 당신의 순번입니다! 3분 후에 입장합니다...");
                         setTimeout(function () {
-                            stompClient.disconnect(function () {
-                                log("⛔ 입장 완료 - 대기열에서 나갔습니다.");
-                            });
-                        }, 180000); // 1분 = 60000ms
+                            stompClient.deactivate();
+                            log("⛔ 입장 완료 - 대기열에서 나갔습니다.");
+                        }, 180000);
                         isTheEnd = true;
                     }
-                }
-            });
+                });
 
-            // 접속 시 /app/join 메시지를 보내 초기 순번 할당 요청
-            stompClient.send("/app/join", {}, "");
+                // 순번 할당 요청
+                stompClient.publish({
+                    destination: "/app/join",
+                    body: ""
+                });
+            },
+            onStompError: function (frame) {
+                log("❗ STOMP 에러 발생: " + frame.headers['message']);
+            }
         });
+
+        stompClient.activate();
     }
 
     function disconnect() {
-        if (stompClient !== null && stompClient.connected) {
-            stompClient.disconnect(function() {
-                log("대기열 연결 종료됨");
-            });
+        if (stompClient && stompClient.connected) {
+            stompClient.deactivate();
+            log("대기열 연결 종료됨");
         } else {
             log("연결되어 있지 않습니다.");
         }
