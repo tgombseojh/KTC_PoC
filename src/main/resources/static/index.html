@@ -39,27 +39,28 @@
 </head>
 <body>
 <h1>KTC - 대기열 PoC</h1>
-<pre id="output"></pre>
 <div>
     <button onclick="connect()">대기열 접속</button>
     <button onclick="disconnect()">대기열 나가기</button>
 </div>
+<pre id="output"></pre>
 <script>
     const SERVER_URL = "ws://10.205.0.108:8080/ws";  // ✅ 순수 WebSocket 주소
     let stompClient = null;
     let currentOrder = 0;
     let leftOrder = 0;
+    let sessions = 0;
     let outReserve = false;
 
     function log(message) {
         const output = document.getElementById("output");
-        output.innerHTML += message + "<br>";
-        output.scrollTop = output.scrollHeight;
+        output.innerHTML = message + "<br>" + output.innerHTML;
     }
 
     function connect() {
         if (stompClient && stompClient.connected) {
             log("이미 연결되어 있습니다.");
+            log(" ");
             return;
         }
 
@@ -74,25 +75,34 @@
             reconnectDelay: 5000,
             onConnect: function (frame) {
                 log("대기열에 연결되었습니다.");
+                log(" ");
 
+                // 개인메세지 받는 토픽
                 stompClient.subscribe('/user/queue/order', function(message) {
                     currentOrder = parseInt(message.body, 10);
                     log("고객님의 순번은: " + currentOrder + "번째 입니다.");
+                    log(" ");
                     if (currentOrder === 1) {
-                        log("🎉 30초 후에 입장합니다...");
+                        log("🎉 당신의 순번입니다! 30초 후에 메인화면으로 진입합니다...");
+                        log(" ");
                         setTimeout(function () {
                             stompClient.webSocket.close();
-                            log("⛔ 입장 완료 - 대기열에서 나갔습니다.");
+                            log("⛔ 메인화면 입장 완료 - 대기열에서 나갔습니다.");
+                            log(" 부하테스트를 위해 5초 후 대기열에 재입장 합니다.");
+                            log(" ");
                             outReserve = true;
                         }, 30000);
                     }
                 });
 
+                // 몇번째 대기자가 일탈했다는 브로드캐스팅 토픽
                 stompClient.subscribe('/topic/waiting', function(message) {
                     leftOrder = parseInt(message.body, 10);
                     if (currentOrder > 1 && currentOrder > leftOrder) {
                         currentOrder--;
                         log("앞선 고객님들의 접속 종료로 인해 순번 감소,\n고객님의 새로운 순번은 " + currentOrder + "번째 입니다.");
+                        log(" ");
+                        // 클라이언트의 순번을 서버로 전송
                         stompClient.publish({
                             destination: "/app/update-order",
                             body: JSON.stringify({ newOrder: currentOrder })
@@ -100,16 +110,32 @@
                     }
 
                     if (!outReserve && currentOrder === 1) {
-                        log("🎉 당신의 순번입니다! 30초 후에 입장합니다...");
+                        log("🎉 당신의 순번입니다! 30초 후에 메인화면으로 진입합니다...");
                         setTimeout(function () {
                             //disconnect();
                             stompClient.webSocket.close();  // 자동재접속으로 서버에 부하를 주기 위해서
-                            log("⛔ 입장 완료 - 대기열에서 나갔습니다.");
+                            log("⛔ 메인화면으로 진입 - 대기열에서 나갔습니다.");
+                            log(" 부하테스트를 위해 5초 후 대기열에 재입장 합니다.");
+                            log(" ");
                         }, 30000);
                     }
                 });
 
-                // 순번 할당 요청
+                // 서버의 활설 세션 수를 받는 브로드캐스팅 토픽
+                stompClient.subscribe('/topic/sessions', function(message) {
+                    sessions = parseInt(message.body, 10);
+                    if (currentOrder > sessions) {
+                        currentOrder = sessions;
+                        log("앞선 고객님들의 접속 종료로 인해 순번 감소,\n고객님의 새로운 순번은 " + currentOrder + "번째 입니다.");
+                        log(" ");
+                        stompClient.publish({
+                            destination: "/app/update-order",
+                            body: JSON.stringify({ newOrder: currentOrder })
+                        });
+                    }
+                });
+
+                // 순번 할당 요청. 서버의 응답은 개인 토픽으로 전달.
                 stompClient.publish({
                     destination: "/app/join",
                     body: ""

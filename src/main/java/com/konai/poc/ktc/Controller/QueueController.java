@@ -11,6 +11,7 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.security.Principal;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Controller
@@ -43,7 +44,8 @@ public class QueueController {
     }
 
     @MessageMapping("/update-order")
-    public void updateOrder(Message<?> message, Principal principal) {
+    public void updateOrder(Message<?> message) {
+    //public void updateOrder(Message<?> message, Principal principal) {
         SimpMessageHeaderAccessor accessor = SimpMessageHeaderAccessor.wrap(message);
 
         Map<String, Object> attrs = accessor.getSessionAttributes();
@@ -60,6 +62,8 @@ public class QueueController {
     }
 
 
+    // todo 이탈자가 생기는 즉시 1단위로 이벤트를 전파해서 고객 순번이 차감되는게 옳은가
+    //      세션 수도 같이 발행해서, 고객들의 순번이 세션 수 보다 크지 않도록만 하면 될까
     @EventListener
     public void handleSessionDisconnect(SessionDisconnectEvent event) {
         //String sessionId = event.getSessionId();
@@ -70,19 +74,14 @@ public class QueueController {
 
         connectionCount.decrementAndGet();
 
-        // 세션에서 순번 꺼내기
+        // 세션에서 순번 꺼내기 (뭉텅이로 이탈하는 경우에는 아웃바운드가 많다)
         SimpMessageHeaderAccessor accessor = SimpMessageHeaderAccessor.wrap(event.getMessage());
-        Map<String, Object> attrs = accessor.getSessionAttributes();
-        if (attrs != null && attrs.containsKey("order")) {
-            int leftOrder = (int) attrs.get("order");
-
-            // 떠난 사용자의 순번 포함해서 메시지 전송
-            messagingTemplate.convertAndSend("/topic/waiting", leftOrder);
-
-            //System.out.println("👋 나간 사용자 순번 발행: " + leftOrder);
-        } else {
-            //System.out.println("❗ 세션에서 순번 정보를 찾을 수 없습니다.");
-        }
+        Optional.ofNullable(accessor.getSessionAttributes())
+                .map(attrs -> attrs.get("order"))
+                .filter(val -> val instanceof Integer)
+                .map(val -> (Integer) val)
+                .filter(order -> order > 0)
+                .ifPresent(order -> messagingTemplate.convertAndSend("/topic/waiting", order));
     }
 
 }
