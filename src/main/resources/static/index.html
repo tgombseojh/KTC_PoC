@@ -49,7 +49,7 @@
     let stompClient = null;
     let currentOrder = 0;
     let leftOrder = 0;
-    let isTheEnd = false;
+    let outReserve = false;
 
     function log(message) {
         const output = document.getElementById("output");
@@ -78,6 +78,14 @@
                 stompClient.subscribe('/user/queue/order', function(message) {
                     currentOrder = parseInt(message.body, 10);
                     log("고객님의 순번은: " + currentOrder + "번째 입니다.");
+                    if (currentOrder === 1) {
+                        log("🎉 30초 후에 입장합니다...");
+                        setTimeout(function () {
+                            stompClient.webSocket.close();
+                            log("⛔ 입장 완료 - 대기열에서 나갔습니다.");
+                            outReserve = true;
+                        }, 30000);
+                    }
                 });
 
                 stompClient.subscribe('/topic/waiting', function(message) {
@@ -91,13 +99,13 @@
                         });
                     }
 
-                    if (!isTheEnd && currentOrder === 1) {
-                        log("🎉 당신의 순번입니다! 3분 후에 입장합니다...");
+                    if (!outReserve && currentOrder === 1) {
+                        log("🎉 당신의 순번입니다! 30초 후에 입장합니다...");
                         setTimeout(function () {
-                            stompClient.deactivate();
+                            //disconnect();
+                            stompClient.webSocket.close();  // 자동재접속으로 서버에 부하를 주기 위해서
                             log("⛔ 입장 완료 - 대기열에서 나갔습니다.");
-                        }, 180000);
-                        isTheEnd = true;
+                        }, 30000);
                     }
                 });
 
@@ -109,6 +117,11 @@
             },
             onStompError: function (frame) {
                 log("❗ STOMP 에러 발생: " + frame.headers['message']);
+            },
+            onWebSocketClose: function () {
+                // ✅ 연결 끊겼을 때 순번 초기화
+                currentOrder = 0;
+                log("❌ 연결이 끊겼습니다. 순번 초기화됨");
             }
         });
 
@@ -119,6 +132,7 @@
         if (stompClient && stompClient.connected) {
             stompClient.deactivate();
             log("대기열 연결 종료됨");
+            currentOrder = 0;
         } else {
             log("연결되어 있지 않습니다.");
         }
