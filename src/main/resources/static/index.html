@@ -57,6 +57,11 @@
         output.innerHTML = message + "<br>" + output.innerHTML;
     }
 
+    function cleanLog(message) {
+        const output = document.getElementById("output");
+        output.innerHTML = message;
+    }
+
     function connect() {
         if (stompClient && stompClient.connected) {
             log("이미 연결되어 있습니다.");
@@ -72,9 +77,9 @@
             },
             heartbeatIncoming: 5000,
             heartbeatOutgoing: 5000,
-            reconnectDelay: 5000,
+            reconnectDelay: 0,
             onConnect: function (frame) {
-                log("대기열에 연결되었습니다.");
+                cleanLog("대기열에 연결되었습니다.");
                 log(" ");
 
                 // 개인메세지 받는 토픽
@@ -83,12 +88,12 @@
                     log("고객님의 순번은: " + currentOrder + "번째 입니다.");
                     log(" ");
                     if (currentOrder === 1) {
-                        log("🎉 당신의 순번입니다! 30초 후에 메인화면으로 진입합니다...");
+                        log("🎉 고객님이 입장하실 차례입니다! 30초 후에 메인화면으로 진입합니다...");
                         log(" ");
                         setTimeout(function () {
                             stompClient.webSocket.close();
                             log("⛔ 메인화면 입장 완료 - 대기열에서 나갔습니다.");
-                            log(" 부하테스트를 위해 5초 후 대기열에 재입장 합니다.");
+                            //log(" 부하테스트를 위해 5초 후 대기열에 재입장 합니다.");
                             log(" ");
                             outReserve = true;
                         }, 30000);
@@ -100,7 +105,7 @@
                     leftOrder = parseInt(message.body, 10);
                     if (currentOrder > 1 && currentOrder > leftOrder) {
                         currentOrder--;
-                        log("앞선 고객님들의 접속 종료로 인해 순번 감소,\n고객님의 새로운 순번은 " + currentOrder + "번째 입니다.");
+                        log("고객님의 순번은: " + currentOrder + "번째 입니다.");
                         log(" ");
                         // 클라이언트의 순번을 서버로 전송
                         stompClient.publish({
@@ -110,12 +115,12 @@
                     }
 
                     if (!outReserve && currentOrder === 1) {
-                        log("🎉 당신의 순번입니다! 30초 후에 메인화면으로 진입합니다...");
+                        log("🎉 고객님이 입장하실 차례입니다! 30초 후에 메인화면으로 진입합니다...");
                         setTimeout(function () {
                             //disconnect();
                             stompClient.webSocket.close();  // 자동재접속으로 서버에 부하를 주기 위해서
                             log("⛔ 메인화면으로 진입 - 대기열에서 나갔습니다.");
-                            log(" 부하테스트를 위해 5초 후 대기열에 재입장 합니다.");
+                            //log(" 부하테스트를 위해 5초 후 대기열에 재입장 합니다.");
                             log(" ");
                         }, 30000);
                     }
@@ -126,7 +131,7 @@
                     sessions = parseInt(message.body, 10);
                     if (currentOrder > sessions) {
                         currentOrder = sessions;
-                        log("앞선 고객님들의 접속 종료로 인해 순번 감소,\n고객님의 새로운 순번은 " + currentOrder + "번째 입니다.");
+                        log("고객님의 순번은: " + currentOrder + "번째 입니다.");
                         log(" ");
                         stompClient.publish({
                             destination: "/app/update-order",
@@ -147,7 +152,7 @@
             onWebSocketClose: function () {
                 // ✅ 연결 끊겼을 때 순번 초기화
                 currentOrder = 0;
-                log("❌ 연결이 끊겼습니다. 순번 초기화됨");
+                log("❌ 대기열 연결이 끊겼습니다.");
             }
         });
 
