@@ -73,6 +73,8 @@ public class QueueController {
         //System.out.println("남은 접속자 수: " + connectionCount.get());
 
         connectionCount.decrementAndGet();
+        // 너무 많은 연결이 동시에 끊어지는 경우 // 연결이 끊겼으나, 감지되지 않는 경우 // GC동작으로 CPU 사용률이 급증하는 현상
+
 
         // 세션에서 순번 꺼내기 (뭉텅이로 이탈하는 경우에는 아웃바운드가 많다)
         SimpMessageHeaderAccessor accessor = SimpMessageHeaderAccessor.wrap(event.getMessage());
@@ -81,7 +83,7 @@ public class QueueController {
                 .filter(val -> val instanceof Integer)
                 .map(val -> (Integer) val)
                 .filter(order -> order > 0)
-                .ifPresent(order -> messagingTemplate.convertAndSend("/topic/waiting", order));
+                .ifPresent(order -> messagingTemplate.convertAndSend("/topic/waiting", order)); // 브로드캐스팅 채널
     }
 
 }
