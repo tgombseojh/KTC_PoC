@@ -28,10 +28,18 @@ public class MyWebSocketHandler implements WebSocketHandler {
         Flux<Void> inbound = session.receive()
                 .map(WebSocketMessage::getPayloadAsText)
                 .doOnNext(msg -> {
+                    if (msg.startsWith("PING:")) {
+                        session.send(Mono.just(session.textMessage("PONG:" + msg.replace("PING:", "")))).subscribe();
+                    }
+
+                    // UPDATE:4 → 순번 갱신
                     if (msg.startsWith("UPDATE:")) {
                         int newOrder = Integer.parseInt(msg.replace("UPDATE:", "").trim());
                         queueService.updateOrder(sessionId, newOrder);
-                    } else if (msg.equals("LEAVE")) {
+                    }
+
+                    // LEAVE → 나간 사용자 브로드캐스트
+                    else if (msg.equals("LEAVE")) {
                         Integer leftOrder = queueService.removeSession(sessionId);
                         if (leftOrder != null) {
                             waitingSink.tryEmitNext("WAITING:" + leftOrder);
@@ -39,7 +47,8 @@ public class MyWebSocketHandler implements WebSocketHandler {
                         }
                     }
                 })
-                .thenMany(Flux.never());
+                .thenMany(Flux.never()); // 수신 스트림을 계속 열어둠
+
 
         Flux<WebSocketMessage> outbound = waitingSink.asFlux()
                 .map(session::textMessage);
