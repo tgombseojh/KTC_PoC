@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket 대기열 클라이언트</title>
+    <style>
+        body { font-family: sans-serif; font-size: 1.2em; padding: 1em; background: #f9f9f9; }
+        #log { white-space: pre-wrap; background: #fff; border: 1px solid #ccc; padding: 1em; height: 300px; overflow-y: auto; }
+        button { margin-right: 0.5em; }
+    </style>
+</head>
+<body>
+
+<h2>📡 WebSocket 대기열 클라이언트</h2>
+<div id="log"></div>
+<br>
+<button onclick="connect()">연결</button>
+<button onclick="leave()">수동 이탈</button>
+
+<script>
+    let socket;
+    let currentOrder = 0;
+    let sessions = 0; // ✅ 전역 변수로 세션 수 저장
+
+    function log(message) {
+        const logEl = document.getElementById("log");
+        logEl.textContent += message + "\n";
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function connect() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            log("⚠️ 이미 연결되어 있습니다.");
+            return;
+        }
+
+        socket = new WebSocket("ws://localhost:8080/ws");
+
+        socket.onopen = () => {
+            log("✅ 연결됨");
+        };
+
+        socket.onmessage = (event) => {
+            const msg = event.data;
+            //log("📥 수신: " + msg);
+
+            if (msg.startsWith("ORDER:")) {
+                currentOrder = parseInt(msg.split(":")[1]);
+                log("🟢 내 순번은 " + currentOrder + "번입니다.");
+            }
+
+            if (msg.startsWith("WAITING:")) {
+                const leftOrder = parseInt(msg.split(":")[1]);
+
+                if (currentOrder > leftOrder) {
+                    currentOrder--;
+                    log(`⚠️ 순번 ${leftOrder}번 이탈 → 내 순번 보정: ${currentOrder} (총 대기자 수: ${sessions})`);
+                    socket.send("UPDATE:" + currentOrder);
+                }
+            }
+
+            if (msg.startsWith("SESSIONS:")) {
+                sessions = parseInt(msg.split(":")[1]);
+                log(`⚠️ 내 순번: ${currentOrder} (총 대기자 수: ${sessions})`);
+                //log("📊 현재 총 대기자 수: " + sessions);
+            }
+        };
+
+        socket.onclose = () => {
+            log("⛔ 연결 종료");
+            socket = null; // 연결이 끊기면 상태 초기화
+        };
+    }
+
+
+    function leave() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send("LEAVE");
+            //log("📤 수동 이탈 전송됨");
+        } else {
+            log("이미 연결이 종료되어있습니다.");
+        }
+    }
+</script>
+</body>
+</html>

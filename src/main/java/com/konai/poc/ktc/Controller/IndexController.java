@@ -19,7 +19,7 @@ public class IndexController {
     public Mono<ResponseEntity<ClassPathResource>> index() {
         // 만약 index.html 파일이 src/main/resources/public/에 있다면
         // 올바른 경로는 "public/index.html"입니다.
-        ClassPathResource html = new ClassPathResource("static/index.html");
+        ClassPathResource html = new ClassPathResource("static/netty_webflux_websocket_client1.html");
         return Mono.just(ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(html));
     }
 }

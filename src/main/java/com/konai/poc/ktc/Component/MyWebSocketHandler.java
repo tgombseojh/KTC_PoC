@@ -2,6 +2,7 @@ package com.konai.poc.ktc.Component;
 
 import com.konai.poc.ktc.service.QueueService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.reactive.socket.WebSocketMessage;
@@ -22,12 +23,8 @@ public class MyWebSocketHandler implements WebSocketHandler {
         String sessionId = session.getId();
         int order = queueService.assignOrder(sessionId);
 
-        System.out.println("✅ 연결됨: " + sessionId + ", 순번: " + order);
-
-        // 👉 최초 순번 전송
         Mono<Void> sendInitial = session.send(Mono.just(session.textMessage("ORDER:" + order)));
 
-        // 👉 클라이언트로부터 메시지 수신 처리
         Flux<Void> inbound = session.receive()
                 .map(WebSocketMessage::getPayloadAsText)
                 .doOnNext(msg -> {
@@ -35,28 +32,34 @@ public class MyWebSocketHandler implements WebSocketHandler {
                         int newOrder = Integer.parseInt(msg.replace("UPDATE:", "").trim());
                         queueService.updateOrder(sessionId, newOrder);
                     } else if (msg.equals("LEAVE")) {
-                        queueService.removeSession(sessionId);
-                        waitingSink.tryEmitNext("LEAVE:" + sessionId);
-                        session.close().subscribe();
+                        Integer leftOrder = queueService.removeSession(sessionId);
+                        if (leftOrder != null) {
+                            waitingSink.tryEmitNext("WAITING:" + leftOrder);
+                            session.close().subscribe();
+                        }
                     }
                 })
-                .thenMany(Flux.never()); // 수신 스트림을 끊지 않음
+                .thenMany(Flux.never());
 
-        // 👉 브로드캐스트 메시지 수신 처리 (다른 유저의 이탈 등)
         Flux<WebSocketMessage> outbound = waitingSink.asFlux()
-                .map(msg -> session.textMessage(msg));
-
-        // 👉 실제 송신
-        Mono<Void> sendStream = session.send(outbound);
+                .map(session::textMessage);
 
         return sendInitial
-                .then(Mono.when(inbound, sendStream)) // 수신 + 송신 병렬 실행
+                .then(Mono.when(inbound, session.send(outbound)))
                 .doFinally(signal -> {
-                    Integer removed = queueService.removeSession(sessionId);
-                    if (removed != null) {
-                        System.out.println("⛔ 연결 종료: " + sessionId);
-                        waitingSink.tryEmitNext("WAITING:" + removed);
+                    // ✅ 여기에서 이탈 처리
+                    Integer leftOrder = queueService.removeSession(sessionId);
+                    if (leftOrder != null) {
+                        waitingSink.tryEmitNext("WAITING:" + leftOrder);
+                        System.out.println("⛔ 연결 종료: " + sessionId + ", 순번: " + leftOrder);
                     }
                 });
+    }
+
+
+    @Scheduled(fixedRate = 5000)
+    public void broadcastSessionCount() {
+        int count = queueService.getSessionCount();
+        waitingSink.tryEmitNext("SESSIONS:" + count);
     }
 }

@@ -9,13 +9,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service
 public class QueueService {
 
-    private final AtomicInteger orderCounter = new AtomicInteger(0);
+    private final AtomicInteger connectionCount = new AtomicInteger(0);
     private final Map<String, Integer> sessionOrderMap = new ConcurrentHashMap<>();
 
     public int assignOrder(String sessionId) {
-        int order = orderCounter.incrementAndGet();
-        sessionOrderMap.put(sessionId, order);
-        return order;
+        int current = connectionCount.incrementAndGet();
+        sessionOrderMap.put(sessionId, current);
+        return current;
     }
 
     public void updateOrder(String sessionId, int newOrder) {
@@ -23,11 +23,16 @@ public class QueueService {
     }
 
     public Integer removeSession(String sessionId) {
-        return sessionOrderMap.remove(sessionId);
+        connectionCount.decrementAndGet(); // 접속 수 감소
+        return sessionOrderMap.remove(sessionId); // 순번 제거
     }
 
     public int getSessionCount() {
-        return sessionOrderMap.size();
+        return connectionCount.get();
+    }
+
+    public Integer getOrder(String sessionId) {
+        return sessionOrderMap.get(sessionId);
     }
 
     public Map<String, Integer> getAllOrders() {
