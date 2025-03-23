@@ -16,12 +16,12 @@ import reactor.core.publisher.Sinks;
 public class MyWebSocketHandler implements WebSocketHandler {
 
     private final QueueService queueService;
-    private final Sinks.Many<String> waitingSink = Sinks.many().multicast().onBackpressureBuffer();
+    private final Sinks.Many<String> waitingSink = Sinks.many().multicast().directBestEffort();
 
     @Override
     public Mono<Void> handle(WebSocketSession session) {
         String sessionId = session.getId();
-        int order = queueService.assignOrder(sessionId);
+        int order = queueService.assignOrder(sessionId, session);
 
         Mono<Void> sendInitial = session.send(Mono.just(session.textMessage("ORDER:" + order)));
 
@@ -60,7 +60,7 @@ public class MyWebSocketHandler implements WebSocketHandler {
                     Integer leftOrder = queueService.removeSession(sessionId);
                     if (leftOrder != null) {
                         waitingSink.tryEmitNext("WAITING:" + leftOrder);
-                        System.out.println("⛔ 연결 종료: " + sessionId + ", 순번: " + leftOrder);
+                        //System.out.println("⛔ 연결 종료: " + sessionId + ", 순번: " + leftOrder);
                     }
                 });
     }
@@ -70,5 +70,11 @@ public class MyWebSocketHandler implements WebSocketHandler {
     public void broadcastSessionCount() {
         int count = queueService.getSessionCount();
         waitingSink.tryEmitNext("SESSIONS:" + count);
+        //System.out.println("총 대기자 : "+count);
+    }
+
+    @Scheduled(fixedRate = 5000) // 10초마다 실행
+    public void cleanDeadSessions() {
+        queueService.cleanupDeadSessions();
     }
 }

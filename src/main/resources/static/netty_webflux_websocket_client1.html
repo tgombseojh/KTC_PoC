@@ -61,6 +61,7 @@
 
             if (msg.startsWith("SESSIONS:")) {
                 sessions = parseInt(msg.split(":")[1]);
+                if (currentOrder > sessions) currentOrder = sessions;
                 log(`⚠️ 내 순번: ${currentOrder} (총 대기자 수: ${sessions})`);
                 //log("📊 현재 총 대기자 수: " + sessions);
             }

@@ -1,6 +1,6 @@
 package com.konai.poc.ktc.service;
-
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.socket.WebSocketSession;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -10,11 +10,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class QueueService {
 
     private final AtomicInteger connectionCount = new AtomicInteger(0);
+
+    // ✅ 세션 ID → 순번
     private final Map<String, Integer> sessionOrderMap = new ConcurrentHashMap<>();
 
-    public int assignOrder(String sessionId) {
+    // ✅ 세션 ID → WebSocketSession
+    private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
+
+    public int assignOrder(String sessionId, WebSocketSession session) {
         int current = connectionCount.incrementAndGet();
         sessionOrderMap.put(sessionId, current);
+        sessionMap.put(sessionId, session);
         return current;
     }
 
@@ -23,8 +29,9 @@ public class QueueService {
     }
 
     public Integer removeSession(String sessionId) {
-        connectionCount.decrementAndGet(); // 접속 수 감소
-        return sessionOrderMap.remove(sessionId); // 순번 제거
+        connectionCount.decrementAndGet();
+        sessionMap.remove(sessionId);
+        return sessionOrderMap.remove(sessionId);
     }
 
     public int getSessionCount() {
@@ -37,5 +44,17 @@ public class QueueService {
 
     public Map<String, Integer> getAllOrders() {
         return sessionOrderMap;
+    }
+
+    // ✅ 연결이 끊긴 세션 제거 (정리용)
+    public void cleanupDeadSessions() {
+        sessionMap.forEach((sessionId, session) -> {
+            if (!session.isOpen()) {
+                sessionMap.remove(sessionId);
+                sessionOrderMap.remove(sessionId);
+                connectionCount.decrementAndGet();
+                System.out.println("🧹 끊긴 세션 제거됨: " + sessionId);
+            }
+        });
     }
 }

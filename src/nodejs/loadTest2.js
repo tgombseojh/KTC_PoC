@@ -1,8 +1,8 @@
 const WebSocket = require('ws');
 
 const args = process.argv.slice(2);
-const CLIENT_COUNT = parseInt(args[0], 10) || 10000;
-const SERVER_URL = "ws://localhost:8080/ws";
+const CLIENT_COUNT = parseInt(args[0], 10) || 100000;
+const SERVER_URL = "ws://172.30.1.26:8080/ws";
 
 let connected = 0;
 let disconnected = 0;
