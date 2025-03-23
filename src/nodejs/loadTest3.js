@@ -71,6 +71,7 @@ for (let i = 0; i < CLIENT_COUNT; i++) {
 
 // 상태 출력
 setInterval(() => {
-    console.log(`[STATUS] Connected: ${connected}/${CLIENT_COUNT}, TotalClientCount: ${sessions}, Disconnected: ${disconnected}, Errors: ${errorCount}`);
+    const avgLatency = latencySamples > 0 ? (totalLatency / latencySamples).toFixed(2) : "-";
+    console.log(`[STATUS] Connected: ${connected}/${CLIENT_COUNT}, TotalClientCount: ${sessions}, Disconnected: ${disconnected}, Errors: ${errorCount}, Avg Latency: ${avgLatency}ms`);
 }, 5000);
 
