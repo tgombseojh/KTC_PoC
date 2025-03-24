@@ -44,12 +44,14 @@
             const msg = event.data;
             //log("📥 수신: " + msg);
 
-            if (msg.startsWith("ORDER:")) {
+            if (msg === "BUSY") {
+                console.log("⚠️ 서버가 바쁩니다. 5초 후 재시도...");
+                socket.close();
+                setTimeout(connect, 5000);
+            } else if (msg.startsWith("ORDER:")) {
                 currentOrder = parseInt(msg.split(":")[1]);
                 log("🟢 내 순번은 " + currentOrder + "번입니다.");
-            }
-
-            if (msg.startsWith("WAITING:")) {
+            } else if (msg.startsWith("WAITING:")) {
                 const leftOrder = parseInt(msg.split(":")[1]);
 
                 if (currentOrder > leftOrder) {
@@ -57,9 +59,7 @@
                     log(`⚠️ 순번 ${leftOrder}번 이탈 → 내 순번 보정: ${currentOrder} (총 대기자 수: ${sessions})`);
                     socket.send("UPDATE:" + currentOrder);
                 }
-            }
-
-            if (msg.startsWith("SESSIONS:")) {
+            } else if (msg.startsWith("SESSIONS:")) {
                 sessions = parseInt(msg.split(":")[1]);
                 if (currentOrder > sessions) currentOrder = sessions;
                 log(`⚠️ 내 순번: ${currentOrder} (총 대기자 수: ${sessions})`);
