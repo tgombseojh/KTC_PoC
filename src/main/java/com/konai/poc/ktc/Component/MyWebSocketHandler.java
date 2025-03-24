@@ -15,6 +15,8 @@ import reactor.core.publisher.Sinks;
 @RequiredArgsConstructor
 public class MyWebSocketHandler implements WebSocketHandler {
 
+    private final int MAX_CONNECTIONS = 20004;
+
     private final QueueService queueService;
     private final Sinks.Many<String> waitingSink = Sinks.many().multicast().directBestEffort();
 
@@ -22,6 +24,14 @@ public class MyWebSocketHandler implements WebSocketHandler {
     public Mono<Void> handle(WebSocketSession session) {
         String sessionId = session.getId();
         int order = queueService.assignOrder(sessionId, session);
+
+        int activeSessions = queueService.getSessionCount();
+        // 최대 접속 초과 시
+        if (activeSessions > MAX_CONNECTIONS) {
+            queueService.removeSession(sessionId);
+            return session.send(Mono.just(session.textMessage("BUSY")))
+                    .then(session.close()); // 메시지 전송 후 연결 종료
+        }
 
         Mono<Void> sendInitial = session.send(Mono.just(session.textMessage("ORDER:" + order)));
 
