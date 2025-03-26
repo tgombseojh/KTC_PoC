@@ -28,7 +28,7 @@ public class MyWebSocketHandler implements WebSocketHandler {
         int activeSessions = queueService.getSessionCount();
         // 최대 접속 초과 시
         if (activeSessions > MAX_CONNECTIONS) {
-            queueService.removeSession(sessionId);
+            //queueService.removeSession(sessionId);
             return session.send(Mono.just(session.textMessage("BUSY")))
                     .then(session.close()); // 메시지 전송 후 연결 종료
         }
@@ -66,12 +66,7 @@ public class MyWebSocketHandler implements WebSocketHandler {
         return sendInitial
                 .then(Mono.when(inbound, session.send(outbound)))
                 .doFinally(signal -> {
-                    // ✅ 여기에서 이탈 처리
-                    Integer leftOrder = queueService.removeSession(sessionId);
-                    if (leftOrder != null) {
-                        waitingSink.tryEmitNext("WAITING:" + leftOrder);
-                        //System.out.println("⛔ 연결 종료: " + sessionId + ", 순번: " + leftOrder);
-                    }
+
                 });
     }
 

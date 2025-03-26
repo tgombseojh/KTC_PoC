@@ -55,15 +55,20 @@
                 const leftOrder = parseInt(msg.split(":")[1]);
 
                 if (currentOrder > leftOrder) {
-                    currentOrder--;
+                    // 순번을 1 감소한 후 최소 1로 보장
+                    currentOrder = Math.max(currentOrder - 1, 1);
                     log(`⚠️ 순번 ${leftOrder}번 이탈 → 내 순번 보정: ${currentOrder} (총 대기자 수: ${sessions})`);
                     socket.send("UPDATE:" + currentOrder);
                 }
             } else if (msg.startsWith("SESSIONS:")) {
-                sessions = parseInt(msg.split(":")[1]);
-                if (currentOrder > sessions) currentOrder = sessions;
-                log(`⚠️ 내 순번: ${currentOrder} (총 대기자 수: ${sessions})`);
-                //log("📊 현재 총 대기자 수: " + sessions);
+                const parsed = parseInt(msg.split(":")[1]);
+                if (!isNaN(parsed) && parsed > 0) {
+                    sessions = parsed;
+                    if (currentOrder > sessions) currentOrder = sessions;
+                    log(`⚠️ 내 순번: ${currentOrder} (총 대기자 수: ${sessions})`);
+                } else {
+                    log("⚠️ 잘못된 세션 수 수신됨:", parsed);
+                }
             }
         };
 

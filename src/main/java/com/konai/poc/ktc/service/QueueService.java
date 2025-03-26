@@ -50,9 +50,7 @@ public class QueueService {
     public void cleanupDeadSessions() {
         sessionMap.forEach((sessionId, session) -> {
             if (!session.isOpen()) {
-                sessionMap.remove(sessionId);
-                sessionOrderMap.remove(sessionId);
-                connectionCount.decrementAndGet();
+                removeSession(sessionId);
                 System.out.println("🧹 끊긴 세션 제거됨: " + sessionId);
             }
         });
