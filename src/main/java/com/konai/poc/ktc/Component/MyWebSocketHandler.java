@@ -15,17 +15,19 @@ import reactor.core.publisher.Sinks;
 @RequiredArgsConstructor
 public class MyWebSocketHandler implements WebSocketHandler {
 
-    private final int MAX_CONNECTIONS = 20004;
+    private final int MAX_CONNECTIONS = 50004;
 
     private final QueueService queueService;
     private final Sinks.Many<String> waitingSink = Sinks.many().multicast().directBestEffort();
+
+    int activeSessions;
 
     @Override
     public Mono<Void> handle(WebSocketSession session) {
         String sessionId = session.getId();
         int order = queueService.assignOrder(sessionId, session);
 
-        int activeSessions = queueService.getSessionCount();
+        activeSessions = queueService.getSessionCount();
         // 최대 접속 초과 시
         if (activeSessions > MAX_CONNECTIONS) {
             //queueService.removeSession(sessionId);
@@ -73,9 +75,9 @@ public class MyWebSocketHandler implements WebSocketHandler {
 
     @Scheduled(fixedRate = 5000)
     public void broadcastSessionCount() {
-        int count = queueService.getSessionCount();
-        waitingSink.tryEmitNext("SESSIONS:" + count);
-        //System.out.println("총 대기자 : "+count);
+        activeSessions = queueService.getSessionCount();
+        waitingSink.tryEmitNext("SESSIONS:" + activeSessions);
+        System.out.println("총 대기자 : "+activeSessions);
     }
 
     @Scheduled(fixedRate = 5000) // 10초마다 실행

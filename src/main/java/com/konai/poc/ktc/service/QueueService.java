@@ -51,8 +51,9 @@ public class QueueService {
         sessionMap.forEach((sessionId, session) -> {
             if (!session.isOpen()) {
                 removeSession(sessionId);
-                System.out.println("🧹 끊긴 세션 제거됨: " + sessionId);
+                //System.out.println("🧹 끊긴 세션 제거됨: " + sessionId);
             }
         });
+        System.out.println(" 세션 수: " + sessionMap.size());
     }
 }
