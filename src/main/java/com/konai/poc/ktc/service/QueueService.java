@@ -18,10 +18,10 @@ public class QueueService {
     private final Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
 
     public int assignOrder(String sessionId, WebSocketSession session) {
-        int current = connectionCount.incrementAndGet();
-        sessionOrderMap.put(sessionId, current);
+        //int current = connectionCount.incrementAndGet();
         sessionMap.put(sessionId, session);
-        return current;
+        sessionOrderMap.put(sessionId, sessionMap.size());
+        return sessionMap.size();
     }
 
     public void updateOrder(String sessionId, int newOrder) {
@@ -35,7 +35,7 @@ public class QueueService {
     }
 
     public int getSessionCount() {
-        return connectionCount.get();
+        return sessionMap.size();
     }
 
     public Integer getOrder(String sessionId) {
