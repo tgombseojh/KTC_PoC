@@ -3,7 +3,7 @@ const WebSocket = require('ws');
 const args = process.argv.slice(2);
 const CLIENT_COUNT = parseInt(args[0], 10) || 1000;
 //const SERVER_URL = "ws://10.205.0.152:8080/ws";
-const SERVER_URL = "ws://127.0.0.1:8080/ws";
+const SERVER_URL = "ws://172.31.3.51:8080/ws";  // aws private network
 //const SERVER_URL = "ws://host.docker.internal:8080/ws";
 
 let connected = 0;
@@ -92,7 +92,7 @@ function createClient(id) {
 for (let i = 0; i < CLIENT_COUNT; i++) {
     setTimeout(() => {
         createClient(i);
-    }, i * 1); // 2ms 간격으로 연결
+    }, i * 2); // 2ms 간격으로 연결
 }
 
 // 상태 출력
